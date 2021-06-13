@@ -35,9 +35,6 @@ contract FlightSuretyApp {
     }
     mapping(bytes32 => Flight) private flights;
 
-    // Activation fee constant
-    uint256 activationFee = 10 ether;
-
     /*** Referencing the data contract ***/
     // Adding state variable referencing Data contract
     FlightSuretyData flightSuretyData;
@@ -151,31 +148,6 @@ contract FlightSuretyApp {
         flightSuretyData.registerAirline(newAirline, success, msg.sender);
         return (success, votes);
     }
-
-    /**
-    * @dev Activate an airline
-    *
-    */   
-    function activateAirline
-                            (
-                            )
-                            external
-                            payable
-                            requireIsOperational
-                            requireRegisteredAirline
-                            returns(bool success)
-    {
-        require(!flightSuretyData.isAirlineActivated(msg.sender), "This airline has already been activated");
-        require(msg.value >= activationFee, "Not enough funds sent to pay for the activation fee");
-        flightSuretyData.activateAirline(msg.sender);
-        if (msg.value > activationFee) {
-            uint256 returnedAmount = msg.value.sub(activationFee);
-            msg.sender.transfer(returnedAmount);
-        }
-        success = true;
-        return success;
-    }
-
 
    /**
     * @dev Register a future flight for insuring.

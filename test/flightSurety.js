@@ -103,7 +103,7 @@ contract('Flight Surety Tests', async (accounts) => {
     // ACT
     // The first airline activates its account by paying 10 eth
     try {
-        await config.flightSuretyApp.activateAirline({from: config.firstAirline, value: activationFee});
+        await config.flightSuretyData.fund({from: config.firstAirline, value: activationFee});
     }
     catch(e) {
     }
@@ -128,7 +128,7 @@ contract('Flight Surety Tests', async (accounts) => {
     // ACT
     // The second airline activates its account by paying 10 eth
     try {
-        await config.flightSuretyApp.activateAirline({from: secondAirline, value: activationFee});
+        await config.flightSuretyData.fund({from: secondAirline, value: activationFee});
     }
     catch(e) {
 
@@ -302,44 +302,19 @@ contract('Flight Surety Tests', async (accounts) => {
     // ACT
     // Retrieving the balance of the passenger before the withdrawal
     let balanceBefore = await web3.eth.getBalance(passenger);
-    console.log(balanceBefore);
-    let expectedBalance = new BN(balanceBefore).add(new BN(balanceCredited)).toString();
-    console.log(expectedBalance);
 
-    let addressNew = config.flightSuretyData.address;
-    console.log(addressNew);
-    let contractBalance =await web3.eth.getBalance(addressNew);
-    console.log(contractBalance.toString());
+    // The passenger calls the refunding function
+    let result = await config.flightSuretyData.pay(secondAirline, flightNumber, flightTimestamp, {from: passenger});
 
-    let result1 = await config.flightSuretyData.retrievePolicyInfo.call( 
-        secondAirline, 
-        flightNumber, 
-        flightTimestamp,
-        passenger,
-        {from: secondAirline}
-        );
-
-    console.log(result1.currentBalanceDue);
-
-    // Passenger withdraws the due balance
-    try {
-        await config.flightSuretyData.pay(secondAirline, flightNumber, flightTimestamp, {from: passenger, gas: '500000'});
-    }
-    catch(e) {
-        console.log(e);
-    }
-
-    let result2 = await config.flightSuretyData.retrievePolicyInfo.call( 
-        secondAirline, 
-        flightNumber, 
-        flightTimestamp,
-        passenger,
-        {from: secondAirline}
-        );
-
-    console.log(result2.currentBalanceDue);
-
+    // Retrieving the balance of the passenger after the withdrawal
     let balanceAfter = await web3.eth.getBalance(passenger);
+
+    // Calculating gas cost
+    let gasPrice = await web3.eth.getGasPrice();
+    let gasCost = new BN(gasPrice).mul(new BN(result.receipt.gasUsed));
+
+    // Calculating expected balance after the transaction
+    let expectedBalance = new BN(balanceBefore).add(new BN(balanceCredited)).sub(gasCost).toString();
 
     // ASSERT
     assert.equal(balanceAfter, expectedBalance, "Withdrawal was not successful");

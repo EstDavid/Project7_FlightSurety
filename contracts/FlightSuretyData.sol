@@ -24,10 +24,15 @@ contract FlightSuretyData {
     }
 
     mapping(address => airlineProfile) airlineRegistry; // Registry of airlines
-    mapping(address => uint256) private authorizedContracts;    // Registry of authorized (Dapp) contracts
 
     uint256 registeredAirlines = 0;     // This counter keeps track of the airlines which are registered
-    uint256 activeAirlines = 0;         // This counter keeps trak of the airlines which have paid the registration fee 
+    uint256 activeAirlines = 0;         // This counter keeps trak of the airlines which have paid the registration fee
+
+    // Activation fee constant
+    uint256 activationFee = 10 ether;
+
+    /*** Registry of authorized (Dapp) contracts ***/
+    mapping(address => uint256) private authorizedContracts;
 
     /*** Insurance data variables ***/
     // Flight Register. Its purpose is to prevent passengers from booking non-existent flights
@@ -110,6 +115,24 @@ contract FlightSuretyData {
     modifier isCallerAuthorized() 
     {
         require(authorizedContracts[msg.sender] == 1, "Caller not authorized");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires an Airline to have been registered
+    */
+    modifier requireRegisteredAirline() 
+    {
+        require(airlineRegistry[msg.sender].isRegistered, "Only registered airlines can call this function");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires an Airline to be active(have funded the contract)
+    */
+    modifier requiredActivatedAirline() 
+    {
+        require(airlineRegistry[msg.sender].isActive, "Only registered airlines can call this function");
         _;
     }
 
@@ -210,49 +233,6 @@ contract FlightSuretyData {
             registeredAirlines = registeredAirlines.add(1);
         }
     }
-
-    /**
-    * @dev Set an airline active once they have paid the registration fee
-    *      Can only be called from FlightSuretyApp contract
-    *
-    */   
-    function activateAirline
-                            (
-                                address newAirline
-                            )
-                            external
-                            requireIsOperational
-                            isCallerAuthorized
-    {
-        require(!airlineRegistry[newAirline].isActive, "This airline has already been activated");
-        airlineRegistry[newAirline].isActive = true;
-        activeAirlines = activeAirlines.add(1);
-    }
-
-    /**
-    * @dev Activate an airline
-    *
-    */   
-    function activateAirline
-                            (
-                            )
-                            external
-                            payable
-                            requireIsOperational
-                            requireRegisteredAirline
-                            returns(bool success)
-    {
-        require(!flightSuretyData.isAirlineActivated(msg.sender), "This airline has already been activated");
-        require(msg.value >= activationFee, "Not enough funds sent to pay for the activation fee");
-        flightSuretyData.activateAirline(msg.sender);
-        if (msg.value > activationFee) {
-            uint256 returnedAmount = msg.value.sub(activationFee);
-            msg.sender.transfer(returnedAmount);
-        }
-        success = true;
-        return success;
-    }
-
 
     /**
     * @dev Checks whether an airline is registered
@@ -475,7 +455,17 @@ contract FlightSuretyData {
                             )
                             public
                             payable
+                            requireIsOperational
+                            requireRegisteredAirline
     {
+        require(!airlineRegistry[msg.sender].isActive, "This airline has already been activated");
+        require(msg.value >= activationFee, "Not enough funds sent to pay for the activation fee");
+        airlineRegistry[msg.sender].isActive = true;
+        activeAirlines = activeAirlines.add(1);
+        if (msg.value > activationFee) {
+            uint256 returnedAmount = msg.value.sub(activationFee);
+            msg.sender.transfer(returnedAmount);
+        }
     }
 
     function getFlightKey
