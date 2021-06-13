@@ -8,23 +8,24 @@ var Config = async function(accounts) {
     // These test addresses are useful when you need to add
     // multiple users in test scripts
     let testAddresses = [
-        "0x69e1CB5cFcA8A311586e3406ed0301C06fb839a2",
-        "0xF014343BDFFbED8660A9d8721deC985126f189F3",
-        "0x0E79EDbD6A727CfeE09A2b1d0A59F7752d5bf7C9",
-        "0x9bC1169Ca09555bf2721A5C9eC6D69c8073bfeB4",
-        "0xa23eAEf02F9E0338EEcDa8Fdd0A73aDD781b2A86",
-        "0x6b85cc8f612d5457d49775439335f83e12b8cfde",
-        "0xcbd22ff1ded1423fbc24a7af2148745878800024",
-        "0xc257274276a4e539741ca11b590b9447b26a8051",
-        "0x2f2899d6d35b1a48a4fbdc93a37a72f264a9fca7"
+        "0x3DF3AB7C3fF3C5e9a40731C155446245653dCa33",
+        "0xd84312CE4C4b9eD387A6941f6495778dd0E0bA44",
+        "0xEA11C97F59573B5538FCD777C9876A54d50E344b",
+        "0xfbaC81Bda65519C3e15d6E5B8739bf85496256F7",
+        "0xb957F3F21362293d5842227F32D775896C6dc395",
+        "0xf14aEe58e43E529c9a1345b3448541eeF670FAd7",
+        "0x452bbe1cE37D1643E719d84eCD60A6FD0705d886",
+        "0x0Dd81B108bb50d59fb5885336e83125cAd91d9Df",
+        "0xdd2eFF08e0b49bb2ecf008046c62F1a912fa5F1D",
+        "0xb85a113A6715d922d4319a7FE10F5A36C1324221"
     ];
 
 
     let owner = accounts[0];
     let firstAirline = accounts[1];
 
-    let flightSuretyData = await FlightSuretyData.new();
-    let flightSuretyApp = await FlightSuretyApp.new();
+    let flightSuretyData = await FlightSuretyData.new(firstAirline);
+    let flightSuretyApp = await FlightSuretyApp.new(flightSuretyData.address);
 
     
     return {

@@ -12,6 +12,48 @@ contract FlightSuretyData {
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
+    /*** Variables to keep track of the airline queuing process ***/
+    // This mapping keeps track of which airlines have already voted for an airline
+    mapping(address => mapping(address => bool)) airlineVotesRegister;
+    
+    // This structs keep track of the voting process and activation of airlines
+    struct airlineProfile {
+        uint256 votesCounter;
+        bool isRegistered;
+        bool isActive;  // It doesn't become true until the airline doesn't pay the 10 ether fee
+    }
+
+    mapping(address => airlineProfile) airlineRegistry; // Registry of airlines
+    mapping(address => uint256) private authorizedContracts;    // Registry of authorized (Dapp) contracts
+
+    uint256 registeredAirlines = 0;     // This counter keeps track of the airlines which are registered
+    uint256 activeAirlines = 0;         // This counter keeps trak of the airlines which have paid the registration fee 
+
+    /*** Insurance data variables ***/
+    // Flight Register. Its purpose is to prevent passengers from booking non-existent flights
+    struct flightInfo {
+        bool isRegistered;
+        uint256 timestamp;
+    }
+
+    mapping(bytes32 => flightInfo) public flightRegister;
+
+    // Insuree List
+    mapping(bytes32 => address[]) insureeList;
+    
+    struct insuranceData {
+        bool isActive;
+        address passenger;
+        string flight;
+        uint256 premium;
+        uint256 balanceDue;
+    }
+
+    mapping(bytes32 => insuranceData) public insurancePolicy;
+
+    // Max premium amount
+    uint256 maxPremium;
+
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
@@ -20,13 +62,19 @@ contract FlightSuretyData {
     /**
     * @dev Constructor
     *      The deploying account becomes contractOwner
+    *      The address of the first line to be registered is passed to the constructor
+    *      This way the first airline doesn't have to be the contract owner
     */
     constructor
                                 (
+                                    address firstAirline
                                 ) 
                                 public 
     {
         contractOwner = msg.sender;
+        airlineRegistry[firstAirline].isRegistered = true;
+        registeredAirlines = registeredAirlines.add(1);
+        maxPremium = 1 ether;
     }
 
     /********************************************************************************************/
@@ -53,6 +101,15 @@ contract FlightSuretyData {
     modifier requireContractOwner()
     {
         require(msg.sender == contractOwner, "Caller is not contract owner");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires the authorized app account to be the function caller
+    */
+    modifier isCallerAuthorized() 
+    {
+        require(authorizedContracts[msg.sender] == 1, "Caller not authorized");
         _;
     }
 
@@ -89,6 +146,42 @@ contract FlightSuretyData {
         operational = mode;
     }
 
+    /**
+    * @dev Updates max price to pay for insurance
+    *
+    */    
+    function updateMaxPremium
+                            (
+                                uint256 amount
+                            ) 
+                            external
+                            requireContractOwner 
+    {
+        maxPremium = amount;
+    }    
+
+    /********************************************************************************************/
+    /*                                   RESTRICT USER ACCES FUNCTIONS                          */
+    /********************************************************************************************/
+
+    function authorizeCaller  (
+                                    address appContract
+                                ) 
+                                external
+                                requireContractOwner
+    {
+        authorizedContracts[appContract] = 1;
+    }
+
+    function deauthorizeCaller  (
+                                    address appContract
+                                ) 
+                                external
+                                requireContractOwner
+    {
+        delete authorizedContracts[appContract];
+    }    
+
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -99,25 +192,227 @@ contract FlightSuretyData {
     *
     */   
     function registerAirline
-                            (   
+                            (
+                                address newAirline,
+                                bool register,
+                                address endorsingAirline
                             )
                             external
-                            pure
+                            requireIsOperational
+                            isCallerAuthorized
     {
+        require(!airlineRegistry[newAirline].isRegistered, "This airline has already been registered");
+        require(!airlineVotesRegister[newAirline][endorsingAirline], "The endorsing airline has already voted");
+        airlineVotesRegister[newAirline][endorsingAirline] = true;
+        airlineRegistry[newAirline].votesCounter = airlineRegistry[newAirline].votesCounter.add(1);
+        airlineRegistry[newAirline].isRegistered = register;
+        if (register) {
+            registeredAirlines = registeredAirlines.add(1);
+        }
     }
 
+    /**
+    * @dev Set an airline active once they have paid the registration fee
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */   
+    function activateAirline
+                            (
+                                address newAirline
+                            )
+                            external
+                            requireIsOperational
+                            isCallerAuthorized
+    {
+        require(!airlineRegistry[newAirline].isActive, "This airline has already been activated");
+        airlineRegistry[newAirline].isActive = true;
+        activeAirlines = activeAirlines.add(1);
+    }
+
+    /**
+    * @dev Activate an airline
+    *
+    */   
+    function activateAirline
+                            (
+                            )
+                            external
+                            payable
+                            requireIsOperational
+                            requireRegisteredAirline
+                            returns(bool success)
+    {
+        require(!flightSuretyData.isAirlineActivated(msg.sender), "This airline has already been activated");
+        require(msg.value >= activationFee, "Not enough funds sent to pay for the activation fee");
+        flightSuretyData.activateAirline(msg.sender);
+        if (msg.value > activationFee) {
+            uint256 returnedAmount = msg.value.sub(activationFee);
+            msg.sender.transfer(returnedAmount);
+        }
+        success = true;
+        return success;
+    }
+
+
+    /**
+    * @dev Checks whether an airline is registered
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */  
+    function isAirlineRegistered 
+                                (
+                                    address airline
+                                )
+                                external
+                                view
+                                returns(bool)
+    {
+        return airlineRegistry[airline].isRegistered;
+    }
+
+    /**
+    * @dev Checks whether an airline is active
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */  
+    function isAirlineActivated 
+                                (
+                                    address airline
+                                )
+                                external
+                                view
+                                returns(bool)
+    {
+        return airlineRegistry[airline].isActive;
+    }
+
+    /**
+    * @dev Returns the number of votes an airline has
+    *
+    */  
+    function getAirlineVotesCounter 
+                                (
+                                    address airline
+                                )
+                                external
+                                view
+                                isCallerAuthorized
+                                returns(uint256)
+    {
+        return airlineRegistry[airline].votesCounter;
+    }
+
+    /**
+    * @dev Returns the number of registered airlines
+    *
+    */  
+    function getRegisteredAirlinesCounter
+                                (
+                                )
+                                external
+                                view
+                                isCallerAuthorized
+                                returns(uint256)
+    {
+        return registeredAirlines;
+    }  
+
+    /**
+    * @dev Returns the number of active airlines
+    *
+    */  
+    function getActiveAirlinesCounter
+                                (
+                                )
+                                external
+                                view
+                                isCallerAuthorized
+                                returns(uint256)
+    {
+        return activeAirlines;
+    }    
+
+    /**
+    * @dev Registers a new flight for passengers to buy insurance on
+    *
+    */  
+    function registerFlightForInsurance
+                                (
+                                    address airline,
+                                    string flight,
+                                    uint timestamp 
+                                )
+                                external
+                                view
+                                requireIsOperational
+                                isCallerAuthorized
+    {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        flightRegister[flightKey].isRegistered = true;
+        flightRegister[flightKey].timestamp = timestamp;
+    } 
 
    /**
     * @dev Buy insurance for a flight
     *
     */   
     function buy
-                            (                             
+                            (    
+                                address airline,
+                                string flight,
+                                uint256 timestamp                                                         
                             )
+                            requireIsOperational
                             external
                             payable
     {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        // The flight exists
+        require(flightRegister[flightKey].isRegistered, "This flight doesn't exist");
+        // The insurance is purchased before flight time
+        require(block.timestamp < flightRegister[flightKey].timestamp, "It's too late to book this flight");
+        bytes32 policyKey = keccak256(abi.encodePacked(msg.sender, flightKey));
+        require(!insurancePolicy[policyKey].isActive, "This insurance has already been purchased");
+        require(msg.value <= maxPremium, "Premium is above the maximum amount");
+        insurancePolicy[policyKey] = insuranceData ({
+                                                        isActive: true,
+                                                        passenger: msg.sender,
+                                                        flight: flight,
+                                                        premium: msg.value,
+                                                        balanceDue: 0
+                                                    });
+        insureeList[flightKey].push(msg.sender);
+    }
 
+    /**
+    * @dev Retrieve insurance info
+    *
+    */   
+    function retrievePolicyInfo
+                            (    
+                                address airline,
+                                string flight,
+                                uint256 timestamp,
+                                address passenger                     
+                            )
+                            external
+                            view
+                            returns(
+                                    bool activePolicy, 
+                                    address passengerAddress, 
+                                    string flightNumber, 
+                                    uint256 premiumPaid,
+                                    uint256 currentBalanceDue
+                                    )
+    {
+        require(msg.sender == airline || msg.sender == passenger, "Only flight airline or insuree can access this function");
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        bytes32 policyKey = keccak256(abi.encodePacked(passenger, flightKey));
+        activePolicy = insurancePolicy[policyKey].isActive;
+        passengerAddress = insurancePolicy[policyKey].passenger;
+        flightNumber = insurancePolicy[policyKey].flight;
+        premiumPaid = insurancePolicy[policyKey].premium;
+        currentBalanceDue = insurancePolicy[policyKey].balanceDue;        
     }
 
     /**
@@ -125,11 +420,26 @@ contract FlightSuretyData {
     */
     function creditInsurees
                                 (
+                                    address airline,
+                                    string flight,
+                                    uint256 timestamp,
+                                    uint numerator,
+                                    uint denominator                                  
                                 )
+                                requireIsOperational
+                                isCallerAuthorized
                                 external
-                                pure
     {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        for(uint c = 0; c < insureeList[flightKey].length; c++)
+        {
+            address insuree = insureeList[flightKey][c];
+            bytes32 policyKey = keccak256(abi.encodePacked(insuree, flightKey));
+            // The multiplying factor of the balance due is calculated in the app contract
+            insurancePolicy[policyKey].balanceDue = insurancePolicy[policyKey].premium.mul(numerator).div(denominator);
+            }
     }
+
     
 
     /**
@@ -138,10 +448,21 @@ contract FlightSuretyData {
     */
     function pay
                             (
+                                address airline,
+                                string flight,
+                                uint256 timestamp 
                             )
+                            requireIsOperational
                             external
-                            pure
     {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        bytes32 policyKey = keccak256(abi.encodePacked(msg.sender, flightKey));
+        require(insurancePolicy[policyKey].isActive, "This policy is not active or it doesn't exist");
+        require(insurancePolicy[policyKey].balanceDue > 0, "This policy hasn't been assigned any credit");
+        uint transferAmount = insurancePolicy[policyKey].balanceDue;
+        insurancePolicy[policyKey].balanceDue = 0;
+        insurancePolicy[policyKey].isActive = false;
+        msg.sender.transfer(transferAmount);
     }
 
    /**
