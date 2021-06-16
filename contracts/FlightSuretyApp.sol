@@ -35,14 +35,15 @@ contract FlightSuretyApp {
     }
     mapping(bytes32 => Flight) private flights;
 
+    // The factor by which passengers are compensated (initially 1.5x)is stored in the following variables
+    // This factor can be modified via the updateCompensatingFactor function
+    uint8 factorNumerator = 3;
+    uint8 factorDenominator = 2;
+
     /*** Referencing the data contract ***/
     // Adding state variable referencing Data contract
     FlightSuretyData flightSuretyData;
 
-    // Event fired each time an oracle submits a response
-    event newFlightCreated(address airline, string flight, uint256 timestamp, bytes32 flightKey);
-
-    bytes32 public keyCheck;
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -120,6 +121,18 @@ contract FlightSuretyApp {
         return true;  // Modify to call data contract's status
     }
 
+    function updateCompensatingFactor   (
+                                            uint8 numerator,
+                                            uint8 denominator
+                                        )
+                                        external
+                                        requireIsOperational
+                                        requireContractOwner
+    {
+        factorNumerator = numerator;
+        factorDenominator = denominator;
+    }
+
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -138,14 +151,16 @@ contract FlightSuretyApp {
                             requireActivatedAirline
                             returns(bool success, uint256 votes)
     {
+        bool register;
         votes = flightSuretyData.getAirlineVotesCounter(newAirline).add(1);
         if(flightSuretyData.getRegisteredAirlinesCounter() < 4 || votes.mul(100) >= flightSuretyData.getRegisteredAirlinesCounter().mul(100).div(2)) {
-            success = true;
+            register = true;
         }
         else {
-            success = false;
+            register = false;
         }
-        flightSuretyData.registerAirline(newAirline, success, msg.sender);
+        flightSuretyData.registerAirline(newAirline, register, msg.sender);
+        success = flightSuretyData.isAirlineRegistered(newAirline);
         return (success, votes);
     }
 
@@ -173,23 +188,6 @@ contract FlightSuretyApp {
                                     airline: msg.sender
                                     });
         flightSuretyData.registerFlightForInsurance(msg.sender, flight, timestamp);
-        emit newFlightCreated(msg.sender, flight, timestamp, key);
-        keyCheck = key;
-    }
-
-   /**
-    * @dev Temporary function to test credit and pay functions
-    *
-    */  
-    function lateFlight
-                                (
-                                    string flight,
-                                    uint256 timestamp
-                                )
-                                external
-                                requireIsOperational
-    {
-        flightSuretyData.creditInsurees(msg.sender, flight, timestamp, 3, 2);
     }
     
    /**
@@ -204,8 +202,12 @@ contract FlightSuretyApp {
                                     uint8 statusCode
                                 )
                                 internal
-                                pure
     {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        flights[key].statusCode = statusCode;
+        if(statusCode == 20) {
+            flightSuretyData.creditInsurees(airline, flight, timestamp, factorNumerator, factorDenominator);
+        }
     }
 
 
@@ -228,7 +230,20 @@ contract FlightSuretyApp {
                                             });
 
         emit OracleRequest(index, airline, flight, timestamp);
-    } 
+    }
+
+    function getFlightStatus
+                                (
+                                    address airline,
+                                    string flight,
+                                    uint256 timestamp
+                                )
+                                external
+                                returns (uint8 status)
+    {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        status = flights[key].statusCode;
+    }
 
 
 // region ORACLE MANAGEMENT

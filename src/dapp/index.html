@@ -20,11 +20,61 @@
     </nav>
 
     <main class="container">
-
         <div id="display-wrapper" class="top-20">
         </div>
-        <div class="row top-20">
-            <label class="form">Flight</label> <input type="text" id="flight-number"> <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
+        <btn class="btn btn-primary" id="authorize-app">Authorize App Contract</btn>
+        <div id="airline-registry" >
+            <h2 class="top-20">Airline Registry</h2>
+            <div class="row top-20">
+                <label class="form">Airline Registration</label> 
+                <input type="text" id="new-airline-address" placeholder="New Airline address">
+                <input type="text" id="airline-sponsor" placeholder="Sponsoring Airline address"> 
+                <btn class="btn btn-primary" id="submit-airline">Register airline</btn>
+            </div>
+            <div class="row top-20"></div>
+                <label class="form">Airline Activation</label> 
+                <input type="text" id="activating-airline-address" placeholder="Address of Activating Airline">
+                <input type="number" id="fund-fee" step="0.1" placeholder="Fund fee, at least 10 ETH">
+                <btn class="btn btn-primary" id="fund-airline">Fund airline</btn>
+            </div>
+        <hr>
+        <div id="flight-list" >
+            <h2 class="top-20">Flight list</h2>
+            <div class="row top-20">
+                <label class="form">Flight number</label> 
+                <input type="text" id="flight-number" placeholder="Flight number">
+                <label class="form">Airline</label>
+                <input type="text" id="flight-airline" placeholder="Flight airline address">
+                <btn class="btn btn-primary" id="submit-flight">Register flight</btn>
+            </div>
+        </div>
+        <hr>
+        <div>
+            <h2 class="top-20">Submit flight to oracles</h2>
+            <div class="row top-20">
+                <label class="form">Flight number</label>
+                <input type="text" id="fetch-flight-number">
+                <label class="form">Airline</label> 
+                <input type="text" id="fetch-airline" placeholder="Flight airline">
+                <label class="form">Timestamp</label>
+                <input type="text" id="fetch-timestamp" placeholder="Flight timestamp">
+                <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
+        </div>
+        </div>
+        <hr>
+        <div>
+            <h2 class="row top-20">Purchase insurance</h2>
+            <div>
+                <label class="form">Flight Insurance</label>
+                <br>
+                <input type="text" placeholder="Flight Number" id="insurance-flight-number">
+                <input type="text" placeholder="Timestamp" id="insurance-timestamp">
+                <input type="text" placeholder="Airline address" id="insurance-address">
+                <hr>
+                <input type="number" id="insurance-premium" step="0.01" min="0" max="1" placeholder="Premium up to 1 ETH">
+                <hr>
+                <btn class="btn btn-primary" id="submit-flight-insurance">Purchase insurance</btn>
+            </div>
         </div>
     </main>
 

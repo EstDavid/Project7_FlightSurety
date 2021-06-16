@@ -10,12 +10,16 @@ export default class DOM {
     static h3 = (...args) => DOM.makeElement(`h3`, ...args);
     static h4 = (...args) => DOM.makeElement(`h4`, ...args);
     static h5 = (...args) => DOM.makeElement(`h5`, ...args);
+    static hr = (...args) => DOM.makeElement(`hr`, ...args);
     static header = (...args) => DOM.makeElement(`header`, ...args);
     static section = (...args) => DOM.makeElement(`section`, ...args);
     static p = (...args) => DOM.makeElement(`p`, ...args);
     static span = (...args) => DOM.makeElement(`span`, ...args);
     static img = (...args) => DOM.makeElement(`img`, ...args);
+    static th = (...args) => DOM.makeElement(`th`, ...args);
     static td = (...args) => DOM.makeElement(`td`, ...args);
+    static tr = (...args) => DOM.makeElement(`tr`, ...args);
+    static table = (...args) => DOM.makeElement(`table`, ...args);
     static attributeExceptions = [
       `role`,
     ];

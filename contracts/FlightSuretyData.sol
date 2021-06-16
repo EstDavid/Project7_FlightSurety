@@ -291,7 +291,6 @@ contract FlightSuretyData {
                                 )
                                 external
                                 view
-                                isCallerAuthorized
                                 returns(uint256)
     {
         return registeredAirlines;
