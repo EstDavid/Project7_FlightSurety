@@ -7,7 +7,7 @@ export default class Contract {
     constructor(network, callback) {
 
         let config = Config[network];
-        this.web3 = new Web3(new Web3.providers.HttpProvider(config.url));
+        this.web3 = new Web3(new Web3.providers.WebsocketProvider(config.url.replace('http', 'ws')));
         this.flightSuretyApp = new this.web3.eth.Contract(FlightSuretyApp.abi, config.appAddress);
         this.flightSuretyData = new this.web3.eth.Contract(FlightSuretyData.abi, config.dataAddress);
         this.flightSuretyAppAddress = config.appAddress;
@@ -137,7 +137,7 @@ export default class Contract {
             });
     }
 
-    buy(airline, flight, timestamp, premium, callback) {
+    buy(airline, flight, timestamp, premium, passenger,callback) {
         let self = this;
         let payload = {
             airline: airline,
@@ -148,8 +148,20 @@ export default class Contract {
         console.log(payload);
         self.flightSuretyData.methods
             .buy(payload.airline, payload.flight, payload.timestamp)
-            .send({ from: self.passengers[0], value: payload.premium, gas: '5000000'}, (error, result) => {
+            .send({ from: passenger, value: payload.premium, gas: '5000000'}, (error, result) => {
                 callback(error, payload);
             });
+    }
+
+    listenOracleResponse(callback) {
+        console.log('listening...');
+        let self = this;
+/*         self.flightSuretyApp.events.OracleReport({
+            fromBlock: 0
+          }, function (error, event) {
+              console.log(event);    
+          }); */
+
+        self.flightSuretyApp.events.FlightStatusInfo(callback);
     }
 }

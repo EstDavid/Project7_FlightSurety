@@ -1,4 +1,3 @@
-
 import DOM from './dom';
 import Contract from './contract';
 import './flightsurety.css';
@@ -6,8 +5,6 @@ import './flightsurety.css';
 // Read local storage
 var airlineList;
 var flightList = [];
-
-
 
 (async() => {
 
@@ -32,8 +29,28 @@ var flightList = [];
         } */
 
         
-
+        
         displayAirlines(airlineList, contract);
+
+        contract.listenOracleResponse((error, event) => {
+            //console.log(error,result);
+            if(event) {
+                console.log(result);
+                let eventResult = event.returnValues;
+                let row = 0;
+                console.log(DOM.elid(`flight-row-${row}`));
+                console.log(eventResult);
+                while (document.body.contains(DOM.elid(`flight-row-${row}`))) {
+                    let flightRow = DOM.elid(`flight-row-${row}`);
+                    if(flightRow.children[0].innerText == eventResult.airline &&
+                        flightRow.children[1].innerText == eventResult.flight && 
+                        flightRow.children[2].innerText == eventResult.timestamp) {
+                            flightRow.children[5].innerText = eventResult.status;
+                        }
+                        row += 1;
+                }
+            }            
+        });
         
         // Read list of flights
 /*         if(localStorage.getItem("flights")) {
@@ -84,11 +101,13 @@ var flightList = [];
             contract.registerNewFlight(flight, airline, (error, result) => {
                 if(result) {
                     flightList.push([result.airline, result.flight, result.timestamp]);
+
+                    // Display the list of registered flights
                     displayFlights(flightList, contract);
 
+                    // Add the events for the fetch and buy buttons
                     let row = 0;        
-                    while (DOM.elid(`fetch-row-${row}`) !== undefined) {
-                        console.log(row);
+                    while (document.body.contains(DOM.elid(`fetch-row-${row}`))) {
                         let fetchButton = DOM.elid(`fetch-row-${row}`);
                         let buyButton = DOM.elid(`buy-row-${row}`);
                         fetchButton.addEventListener('click', (event) => {
@@ -106,9 +125,26 @@ var flightList = [];
                             let fetchAirline = flightRow.children[0].innerText;
                             let fetchFlight = flightRow.children[1].innerText;
                             let fetchTimestamp = flightRow.children[2].innerText;
-                            contract.buy(fetchAirline, fetchFlight, fetchTimestamp, 0.5, (error, result) => {
-                                console.log(error);
-                                console.log(result);
+                            let subForm = DOM.div({className: 'top-20'});
+                            flightRow.insertAdjacentElement("afterend", subForm);
+                            subForm.appendChild(DOM.label({className: 'form'}, 'Passenger address'));
+                            let passengerAddressInput = DOM.input({id: 'input-field-0', type: 'text', placeholder: 'Passenger address'}, 'Passenger address');
+                            subForm.appendChild(passengerAddressInput);
+                            subForm.appendChild(DOM.label({className: 'form'}, 'Premium'));
+                            let premiumInput = DOM.input({id: 'input-field-1', type: 'number', step: '0.01', min: '0', max: '1'}, 'Passenger address');
+                            subForm.appendChild(premiumInput);
+                            let rowButton = DOM.button({id: `function-button`, className: 'col-sm btn btn-success table-button'}, "purchase");
+                            let passengerAddress;
+                            let premium;
+                            subForm.appendChild(rowButton);
+                            rowButton.addEventListener('click', () => {
+                                passengerAddress = passengerAddressInput.value;
+                                premium = premiumInput.value;
+                                contract.buy(fetchAirline, fetchFlight, fetchTimestamp, premium, passengerAddress, (error, result) => {
+                                    if(result) {
+                                        alert(`Your flight insurance worth ${premium} ETH for flight ${fetchFlight} on ${fetchTimestamp} has been purchased.\nThank you!`)
+                                    }
+                                });
                             });
                         });
                         row += 1;                
@@ -119,20 +155,6 @@ var flightList = [];
                 }
             });
             let flightsSection = DOM.elid('flight-list');
-
-/*             for(let i = 3; i < flightsSection.children.length; i++) {
-                flightsSection.children[i].children[4].addEventListener('click', (event) => {
-                    console.log(event);
-                    let flightRow = event.target.parentNode;
-                    let fetchAirline = flightRow.children[0].innerText;
-                    let fetchFlight = flightRow.children[1].innerText;
-                    let fetchTimestamp = flightRow.children[2].innerText;
-                    contract.fetchFlightStatus(fetchAirline, fetchFlight, fetchTimestamp, (error, result) => {
-                        console.log(error);
-                        console.log(result);
-                    });
-                })
-            } */
         });
     
 
@@ -155,7 +177,7 @@ var flightList = [];
             contract.buy(airline, flight, timestamp, premium, (error, result) => {
                 display('Insurance Policy', 'Policy Details', [ { label: 'Policy Details', error: error, value: result.flight + ' ' + result.timestamp} ]);
             });
-        })
+        });
     
     });
 
@@ -224,29 +246,21 @@ function displayFlights(flights, contract) {
     section.appendChild(DOM.hr());
     section.appendChild(DOM.h2("List of current flights"));
     let row = section.appendChild(DOM.div({className:'row'}));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Airline address"));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Flight number"));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Timestamp"));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Flight Status"));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Fetch Status"));
-    row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, "Buy Insurance"));
+    let columnNames = ['Airline address', 'Flight number', 'Timestamp', 'Buy Insurance', 'Fetch Status', 'Flight Status'];
+    for(let name of columnNames) {
+        row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, name));        
+    }
     flights.map((flight) => {
         let row = section.appendChild(DOM.div({id: `flight-row-${rowNumber}`, className:'row'}));
         row.appendChild(DOM.div({className: 'col-sm field-value text-truncate'}, flight[0]));
         row.appendChild(DOM.div({className: 'col-sm field'}, flight[1]));
         row.appendChild(DOM.div({className: 'col-sm field-value'}, flight[2].toString()));
-         contract.getFlightStatus(flight[0], flight[1], flight[2], (error, result) => {
+        row.appendChild(DOM.button({id: `fetch-row-${rowNumber}`, className: 'col-sm btn btn-primary table-button'}, "Fetch"));
+        row.appendChild(DOM.button({id: `buy-row-${rowNumber}`, className: 'col-sm btn btn-success table-button'}, "Buy"));
+        contract.getFlightStatus(flight[0], flight[1], flight[2], (error, result) => {
             row.appendChild(DOM.div({className: 'col-sm field-value'}, error ? String(error) : String(result)));
         });
-        let fetchButton = DOM.button({id: `fetch-row-${rowNumber}`, className: 'col-sm btn btn-primary table-button'}, "Fetch");
-        let buyButton = DOM.button({id: `buy-row-${rowNumber}`, className: 'col-sm btn btn-success table-button'}, "Buy");
-        row.appendChild(fetchButton);
-        row.appendChild(buyButton);
         rowNumber += 1;
     })
     displayDiv.append(section);
-}
-
-function buyFlightInsurance() {
-
 }
