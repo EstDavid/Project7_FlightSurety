@@ -35,9 +35,6 @@ section {
 }
 
 .text-truncate {
-    max-width: 180px;
-    display: inline-block;
-    vertical-align: bottom;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -51,6 +48,11 @@ label.form {
     font-size: 14px;
     margin-right: 20px;
 }
+
+.subform select, .subform input {
+    margin: 8px;
+}
+
 input {
     /*margin-right: 30px;*/
     width: 100%;

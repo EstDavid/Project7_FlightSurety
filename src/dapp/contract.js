@@ -19,7 +19,7 @@ export default class Contract {
 
     initialize(callback) {
         this.web3.eth.getAccounts((error, accts) => {
-           
+
             this.owner = accts[0];
 
             let counter = 1;
@@ -47,23 +47,21 @@ export default class Contract {
         let self = this;
         self.flightSuretyData.methods
             .authorizeCaller(self.flightSuretyAppAddress)
-            .send({from: self.owner})
+            .send({from: self.owner}, callback)
+    }
+
+    isAppAuthorized(callback) {
+        let self = this;
+        self.flightSuretyData.methods
+            ._isCallerAuthorized()
+            .call({from: self.flightSuretyAppAddress}, callback)
     }
 
     registerAirline(airline, sponsor, callback) {
         let self = this;
         self.flightSuretyApp.methods
             .registerAirline(airline)
-            .send({from: sponsor, gas: '5000000'}, function(err, res) {
-                if (err) {
-                    alert("An error occured", err);
-                    console.log(err);
-                    return
-                }
-                alert("Hash of the transaction: " + res);
-                console.log(res);
-            
-            });
+            .send({from: sponsor, gas: '5000000'}, callback);
     }
 
     isAirlineRegistered(airline, callback) {
@@ -89,10 +87,7 @@ export default class Contract {
         let feeETH = self.web3.utils.toWei(fee.toString(), 'ether');
         self.flightSuretyData.methods
             .fund()
-            .send({ from: airline, value: feeETH}, (error, result) => {
-                alert(result);
-                alert(error);
-            });
+            .send({ from: airline, value: feeETH, gas: '5000000'}, callback);
     }
 
     getAirlines() {
@@ -142,26 +137,48 @@ export default class Contract {
         let payload = {
             airline: airline,
             flight: flight,
-            timestamp: Math.floor(timestamp),
-            value: premium
+            timestamp: timestamp,
+            value: self.web3.utils.toWei(premium.toString(), 'ether')
         }
         console.log(payload);
         self.flightSuretyData.methods
             .buy(payload.airline, payload.flight, payload.timestamp)
-            .send({ from: passenger, value: payload.premium, gas: '5000000'}, (error, result) => {
+            .send({ from: passenger, value: payload.value, gas: '5000000'}, (error, result) => {
                 callback(error, payload);
             });
     }
 
-    listenOracleResponse(callback) {
-        console.log('listening...');
+    getInsuranceStatus(airline, flight, timestamp, passenger, callback) {
         let self = this;
-/*         self.flightSuretyApp.events.OracleReport({
-            fromBlock: 0
-          }, function (error, event) {
-              console.log(event);    
-          }); */
+        let payload = {
+            airline: airline,
+            flight: flight,
+            timestamp: timestamp
+        }
+        console.log(payload);
+        self.flightSuretyData.methods
+            .retrievePolicyInfo(payload.airline, payload.flight, payload.timestamp, passenger)
+            .call({ from: passenger}, (error, result) => {
+                let premiumETH = self.web3.utils.fromWei(result.premiumPaid.toString(), 'ether');
+                let balanceETH = self.web3.utils.fromWei(result.currentBalanceDue.toString(), 'ether');
+                callback([premiumETH, balanceETH]);
+            });
+    }
 
+    claimInsurance(airline, flight, timestamp, passenger, callback) {
+        let self = this;
+        let payload = {
+            airline: airline,
+            flight: flight,
+            timestamp: timestamp
+        }
+        self.flightSuretyData.methods
+            .pay(payload.airline, payload.flight, payload.timestamp)
+            .send({ from: passenger, gas: '5000000'}, callback);        
+    }
+
+    listenOracleResponse(callback) {
+        let self = this;
         self.flightSuretyApp.events.FlightStatusInfo(callback);
     }
 }

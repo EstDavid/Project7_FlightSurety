@@ -153,6 +153,18 @@ contract FlightSuretyData {
         return operational;
     }
 
+    /**
+    * @dev Get whether the app contract is authorized
+    *
+    */ 
+    function _isCallerAuthorized() 
+                                    external
+                                    view
+                                    returns (bool)
+    {
+        return authorizedContracts[msg.sender] == 1;
+    }
+
 
     /**
     * @dev Sets contract operations on/off
