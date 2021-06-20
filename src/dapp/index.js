@@ -32,7 +32,12 @@ var flightList = [];
                 DOM.elid('authorize-app').addEventListener('click', () => {
                     // Write transaction
                     contract.authorizeApp( (error, result) => {    
-                        console.log(error, result);          
+                        console.log(error, result);
+                        if(result) {
+                            alert('The App contract has been authorized');
+                            DOM.elid('authorize-app').innerText = 'App Contract authorized';
+                            document.getElementById("authorize-app").disabled = true;
+                        }          
                     });
                 });
             }
@@ -59,7 +64,7 @@ var flightList = [];
                     if(flightRow.children[0].innerText == eventResult.airline &&
                         flightRow.children[1].innerText == eventResult.flight && 
                         flightRow.children[2].innerText == eventResult.timestamp) {
-                            flightRow.children[5].innerText = eventResult.status;
+                            flightRow.children[6].innerText = eventResult.status;
                         }
                         row += 1;
                 }
@@ -77,12 +82,10 @@ var flightList = [];
             console.log(newFlightForm);
             let flight = newFlightForm.elements.flightnumber.value;
             let airline = newFlightForm.elements.flightairline.value;
-            console.log(flight);
-            console.log(airline);
             // Write transaction
-            contract.registerNewFlight(flight, airline, (error, result) => {
+            contract.registerNewFlight(flight, airline, (error, result, payload) => {
                 if(result) {
-                    flightList.push([result.airline, result.flight, result.timestamp]);
+                    flightList.push([payload.airline, payload.flight, payload.timestamp]);
 
                     // Display the list of registered flights
                     displayFlights(flightList, contract);
@@ -290,6 +293,9 @@ function buyFlightInsurance(event, flight, contract) {
         passengerAddress = passengerAddressInput.value;
         premium = premiumInput.value;
         contract.buy(fetchAirline, fetchFlight, fetchTimestamp, premium, passengerAddress, (error, result) => {
+            if(error) {
+                alert(error);
+            }
             if(result) {
                 alert(`Your flight insurance worth ${premium} ETH for flight ${fetchFlight} on ${fetchTimestamp} has been purchased.\nThank you!`);
                 flightRow.parentNode.removeChild(section);
@@ -334,14 +340,13 @@ function checkInsuranceStatus(event, flight, contract) {
                 }
             });
         } else if(event.submitter.value == 'Claim insurance') {
-            contract.claimInsurance(fetchAirline, fetchFlight, fetchTimestamp, passengerAddress, (result, error) => {
-                console.log(error);
-                console.log(result);
+            contract.claimInsurance(fetchAirline, fetchFlight, fetchTimestamp, passengerAddress, (error, result) => {
                 if(error) {
                     alert(error);
                 }
                 console.log(result);
                 if(result) {
+                    console.log(result);
                     alert(`The balance due has been refunded to your account`);
                     flightRow.parentNode.removeChild(section);
                 }

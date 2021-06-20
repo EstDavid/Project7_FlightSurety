@@ -187,7 +187,7 @@ contract FlightSuretyApp {
                                     updatedTimestamp: timestamp,
                                     airline: msg.sender
                                     });
-        flightSuretyData.registerFlightForInsurance(msg.sender, flight, timestamp);
+        flightSuretyData.registerFlightForInsurance(msg.sender, flight, timestamp, true);
     }
     
    /**
@@ -205,6 +205,10 @@ contract FlightSuretyApp {
     {
         bytes32 key = getFlightKey(airline, flight, timestamp);
         flights[key].statusCode = statusCode;
+        // Status other than 0 sets the flight isRegistered variable to false
+        if(statusCode != 0) {
+            flights[key].isRegistered = false;            
+        }
         if(statusCode == 20) {
             flightSuretyData.creditInsurees(airline, flight, timestamp, factorNumerator, factorDenominator);
         }
@@ -349,6 +353,16 @@ contract FlightSuretyApp {
         // oracles respond with the *** same *** information
         emit OracleReport(airline, flight, timestamp, statusCode);
         if (oracleResponses[key].responses[statusCode].length >= MIN_RESPONSES) {
+            
+            // If the status code is other than '0', the attribute isRegistered in the data contract
+            // is set to false in order to prevent any passenger from purchasing the insurance
+            if(statusCode != 0)
+            {
+                flightSuretyData.registerFlightForInsurance(airline, flight, timestamp, false);
+                }
+
+            // The request is closed
+            oracleResponses[key].isOpen = false;
 
             emit FlightStatusInfo(airline, flight, timestamp, statusCode);
 
@@ -476,7 +490,8 @@ contract FlightSuretyData {
                                         (
                                             address airline,
                                             string flight,
-                                            uint256 timestamp
+                                            uint256 timestamp,
+                                            bool registered
                                         )
                                         external;
 

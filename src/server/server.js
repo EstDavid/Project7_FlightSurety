@@ -16,18 +16,25 @@ let statusCodes = [0, 10, 20, 30, 40, 50];
 let registrationFee = web3.utils.toWei('1', 'ether');
 let transactionGas = '2000000';
 
+// Test parameters
+let randomnessOverride = false; // If true, the oracles will submit a specific status code
+let statusCodeOverride = 20; // If override is true, oracles will submit this code
+
 // Retrieving oracle accounts and storing them in variable oracleAccounts
 let oracleAccounts = [];
+let oracleIndexes = {};
 let totalOracles = 20;
 let oracleInitialIndex = 10;
 
 web3.eth.getAccounts((error, accounts) => {
   for(let i = 0; i < totalOracles; i++) {
-    oracleAccounts[i] = accounts[oracleInitialIndex + i];
+    let oracleAddress;
+    oracleAddress = accounts[oracleInitialIndex + i];
+    oracleAccounts.push(oracleAddress);
     flightSuretyApp.methods.
     registerOracle()
     .send({
-      from: oracleAccounts[i],
+      from: oracleAddress,
       value: registrationFee,
       gas: transactionGas},
       (error, result) => {
@@ -38,56 +45,63 @@ web3.eth.getAccounts((error, accounts) => {
           console.log(result);
           flightSuretyApp.methods.
             getMyIndexes()
-            .call({from: oracleAccounts[i]}, (error, result) => {
-              console.log(`Oracle ${oracleAccounts[i]} has index ${result}`);
+            .call({from: oracleAddress}, (error, result) => {
+              console.log(result);
+              console.log(`Oracle ${oracleAddress} has index ${result}`);
+              oracleIndexes[oracleAddress] = result;
             })
         }
               
             });
-    console.log(oracleAccounts[i]);
   }
 });
-
-
-
 
 flightSuretyApp.events.OracleRequest({
     fromBlock: 0
   }, function (error, event) {
     if (error) {console.log(error)}
-    if(event) {
+    if (event) {
       console.log(event);
       let eventResult = event.returnValues;
       for(let oracle of oracleAccounts){
-        flightSuretyApp.methods.
-        getMyIndexes()
-        .call({from: oracle}, (error, indexes) => {
-            // Check if the oracle fullfills the index condition
-            if(eventResult.index == indexes[0] || eventResult.index == indexes[1] || eventResult.index == indexes[2]) {
-              // The status code response is randomized for each oracle
-              let randomIndex = Math.floor((Math.random() * 5) + 1);
-              let status = statusCodes[randomIndex];              
-              flightSuretyApp.methods.
-              submitOracleResponse(
-                eventResult.index,
-                eventResult.airline,
-                eventResult.flight,
-                eventResult.timestamp,
-                status)
-              .send({
-                from: oracle,
-                gas: transactionGas},
-                (error, result) => {
-                  if(error) {
-                    console.log(error);
-                  }
-                  console.log(`Response ${status} from oracle (${indexes}) ${oracle}`);
-                })
+        let indexes = oracleIndexes[oracle];
+        if(indexes) {
+          if(
+            eventResult.index == parseInt(indexes[0]) ||
+            eventResult.index == parseInt(indexes[1]) || 
+            eventResult.index == parseInt(indexes[2])) {
+            // The status code response is randomized for each oracle
+            let randomIndex;
+            let status;
+            if (randomnessOverride) {
+              // If there is a randomness override, this is the code assigned
+              status = statusCodeOverride;
+            } else {
+              // If there is no randomness override, the code assigned is random
+              randomIndex = Math.floor(Math.random() * 6);
+              status = statusCodes[randomIndex];
             }
-        });
+            flightSuretyApp.methods.
+            submitOracleResponse(
+              eventResult.index,
+              eventResult.airline,
+              eventResult.flight,
+              eventResult.timestamp,
+              status)
+            .send({
+              from: oracle,
+              gas: transactionGas},
+              (error, result) => {
+                if(error) {
+                  console.log(error);
+                }
+                console.log(`Response ${status} from oracle (${indexes}) ${oracle}`);
+              });
+          }
+        }
       }      
     }    
-})
+});
 
 flightSuretyApp.events.FlightStatusInfo({
   fromBlock: 0

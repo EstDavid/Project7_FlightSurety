@@ -331,7 +331,8 @@ contract FlightSuretyData {
                                 (
                                     address airline,
                                     string flight,
-                                    uint timestamp 
+                                    uint timestamp,
+                                    bool registered
                                 )
                                 external
                                 view
@@ -339,7 +340,7 @@ contract FlightSuretyData {
                                 isCallerAuthorized
     {
         bytes32 flightKey = getFlightKey(airline, flight, timestamp);
-        flightRegister[flightKey].isRegistered = true;
+        flightRegister[flightKey].isRegistered = registered;
         flightRegister[flightKey].timestamp = timestamp;
     } 
 
@@ -359,7 +360,7 @@ contract FlightSuretyData {
     {
         bytes32 flightKey = getFlightKey(airline, flight, timestamp);
         // The flight exists
-        require(flightRegister[flightKey].isRegistered, "This flight doesn't exist");
+        require(flightRegister[flightKey].isRegistered, "This flight doesn't exist or is not available for insurance");
         // The insurance is purchased before flight time
         require(block.timestamp < flightRegister[flightKey].timestamp, "It's too late to book this flight");
         bytes32 policyKey = keccak256(abi.encodePacked(msg.sender, flightKey));

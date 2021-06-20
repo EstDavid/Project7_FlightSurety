@@ -128,7 +128,7 @@ export default class Contract {
         self.flightSuretyApp.methods
             .registerFlight(payload.flight, payload.timestamp)
             .send({ from: payload.airline, gas: '5000000'}, (error, result) => {
-                callback(error, payload);
+                callback(error, result, payload);
             });
     }
 
@@ -140,12 +140,9 @@ export default class Contract {
             timestamp: timestamp,
             value: self.web3.utils.toWei(premium.toString(), 'ether')
         }
-        console.log(payload);
         self.flightSuretyData.methods
             .buy(payload.airline, payload.flight, payload.timestamp)
-            .send({ from: passenger, value: payload.value, gas: '5000000'}, (error, result) => {
-                callback(error, payload);
-            });
+            .send({ from: passenger, value: payload.value, gas: '5000000'}, callback);
     }
 
     getInsuranceStatus(airline, flight, timestamp, passenger, callback) {
@@ -155,7 +152,6 @@ export default class Contract {
             flight: flight,
             timestamp: timestamp
         }
-        console.log(payload);
         self.flightSuretyData.methods
             .retrievePolicyInfo(payload.airline, payload.flight, payload.timestamp, passenger)
             .call({ from: passenger}, (error, result) => {
