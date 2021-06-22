@@ -46,7 +46,6 @@ web3.eth.getAccounts((error, accounts) => {
           flightSuretyApp.methods.
             getMyIndexes()
             .call({from: oracleAddress}, (error, result) => {
-              console.log(result);
               console.log(`Oracle ${oracleAddress} has index ${result}`);
               oracleIndexes[oracleAddress] = result;
             })
@@ -56,6 +55,8 @@ web3.eth.getAccounts((error, accounts) => {
   }
 });
 
+// Listens to oracleRequest events emitted by the App Contract
+// submits the answer of the oracles which match the index of the request
 flightSuretyApp.events.OracleRequest({
     fromBlock: 0
   }, function (error, event) {
@@ -63,6 +64,8 @@ flightSuretyApp.events.OracleRequest({
     if (event) {
       console.log(event);
       let eventResult = event.returnValues;
+      // Loop through all oracles and submit the response of those with an index
+      // matching the one of the request
       for(let oracle of oracleAccounts){
         let indexes = oracleIndexes[oracle];
         if(indexes) {
@@ -103,6 +106,7 @@ flightSuretyApp.events.OracleRequest({
     }    
 });
 
+// Listen to the 'FlightStatusInfo' event and console log the result
 flightSuretyApp.events.FlightStatusInfo({
   fromBlock: 0
 }, function (error, event) {

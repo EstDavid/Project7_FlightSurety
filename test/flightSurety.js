@@ -4,6 +4,7 @@ var BigNumber = require('bignumber.js');
 var BN = web3.utils.BN;
 
 contract('Flight Surety Tests', async (accounts) => {
+    const owner = accounts[0];
     const secondAirline = accounts[2];
     const thirdAirline = accounts[3];
     const fourthAirline = accounts[4];
@@ -11,10 +12,20 @@ contract('Flight Surety Tests', async (accounts) => {
     const passenger = accounts[6];
     const activationFee = web3.utils.toWei('10', "ether");
 
+    const flightNumber = 'BA3203';
+    let twoDays = 2*24*61*60*1000;
+    const flightTimestamp = Math.floor((Date.now() + twoDays) / 1000);
+
+    let premium = 0.5;
+    let premiumETH = web3.utils.toWei(premium.toString(), "ether");
+
   var config;
   before('setup contract', async () => {
     config = await Test.Config(accounts);
+
+    // App Contract and owner accounts are authorized to execute restricted access funcitons of the Data Contract
     await config.flightSuretyData.authorizeCaller(config.flightSuretyApp.address);
+    await config.flightSuretyData.authorizeCaller(owner);
   });
 
   /****************************************************************************************/
@@ -213,8 +224,6 @@ contract('Flight Surety Tests', async (accounts) => {
   it('(airline) can register a flight for insurance', async () => {
     
     // ARRANGE
-    let flightNumber = 'BA3203';
-    let flightTimestamp = '1623664079';
     let flightKey = web3.utils.soliditySha3(secondAirline, flightNumber, flightTimestamp);
 
     // ACT
@@ -235,17 +244,14 @@ contract('Flight Surety Tests', async (accounts) => {
   it('(passenger) can buy an insurance policy for a flight', async () => {
     
     // ARRANGE
-    let flightNumber = 'BA3203';
-    let flightTimestamp = '1623664079';
-    let premium = web3.utils.toWei('0.5', "ether");
 
     // ACT
     // Passenger purchases insurance for a flight
     try {
-        await config.flightSuretyData.buy(secondAirline, flightNumber, flightTimestamp, {from: passenger, value: premium});
+        await config.flightSuretyData.buy(secondAirline, flightNumber, flightTimestamp, {from: passenger, value: premiumETH});
     }
     catch(e) {
-
+      console.log(e);
     }
 
     let result = await config.flightSuretyData.retrievePolicyInfo.call( 
@@ -260,23 +266,23 @@ contract('Flight Surety Tests', async (accounts) => {
     assert.equal(result.activePolicy, true, "Passenger was not able to buy insurance policy");
     assert.equal(result.passengerAddress, passenger, "Passenger passenger address is wrong");
     assert.equal(result.flightNumber, flightNumber, "Flight number is wrong");
-    assert.equal(result.premiumPaid, premium, "Premium paid is wrong");
+    assert.equal(result.premiumPaid, premiumETH, "Premium paid is wrong");
   });
 
   it('(passenger) is credited once the flight is late', async () => {
     
     // ARRANGE
-    let flightNumber = 'BA3203';
-    let flightTimestamp = '1623664079';
-    let balanceCredited = web3.utils.toWei((0.5*1.5).toString(), 'ether');
+    let refundNumerator = await config.flightSuretyApp.factorNumerator.call();
+    let refundDenominator = await config.flightSuretyApp.factorDenominator.call();
+    let balanceCredited = new BN(premiumETH).mul(refundNumerator).div(refundDenominator).toString();
 
     // ACT
-    // Flight is declared late
+    // Passengers of flight are credited a refund. The owner account is used to override the responses from the oracles
     try {
-        await config.flightSuretyApp.lateFlight(flightNumber, flightTimestamp, {from: secondAirline});
+        await config.flightSuretyData.creditInsurees(secondAirline, flightNumber, flightTimestamp, refundNumerator, refundDenominator, {from: owner});
     }
     catch(e) {
-
+      console.log(e);
     }
 
     let result = await config.flightSuretyData.retrievePolicyInfo.call( 
@@ -294,10 +300,9 @@ contract('Flight Surety Tests', async (accounts) => {
   it('(passenger) can withdraw their balance', async () => {
     
     // ARRANGE
-    let flightNumber = 'BA3203';
-    let flightTimestamp = '1623664079';
-    let premium = web3.utils.toWei('0.5', "ether");
-    let balanceCredited = new BN(premium).mul(new BN('3')).div(new BN(2)).toString();
+    let refundNumerator = await config.flightSuretyApp.factorNumerator.call();
+    let refundDenominator = await config.flightSuretyApp.factorDenominator.call();
+    let balanceCredited = new BN(premiumETH).mul(refundNumerator).div(refundDenominator).toString();
 
     // ACT
     // Retrieving the balance of the passenger before the withdrawal

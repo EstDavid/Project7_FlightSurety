@@ -36,6 +36,7 @@ export default class Contract {
         });
     };
 
+    // Checks if the App Contract is operational
     isOperational(callback) {
        let self = this;
        self.flightSuretyApp.methods
@@ -43,6 +44,7 @@ export default class Contract {
             .call({ from: self.owner}, callback);
     }
 
+    // Allows to authorize the App Contract on the Data Contract
     authorizeApp(callback) {
         let self = this;
         self.flightSuretyData.methods
@@ -50,6 +52,7 @@ export default class Contract {
             .send({from: self.owner}, callback)
     }
 
+    // Checks if the App Contract is authorized on the Data Contract
     isAppAuthorized(callback) {
         let self = this;
         self.flightSuretyData.methods
@@ -57,6 +60,7 @@ export default class Contract {
             .call({from: self.flightSuretyAppAddress}, callback)
     }
 
+    // Calls the registerAirline function of the App contract
     registerAirline(airline, sponsor, callback) {
         let self = this;
         self.flightSuretyApp.methods
@@ -64,6 +68,7 @@ export default class Contract {
             .send({from: sponsor, gas: '5000000'}, callback);
     }
 
+    // Checks if an airline is registered
     isAirlineRegistered(airline, callback) {
         let self = this;
         self.flightSuretyData.methods
@@ -73,6 +78,7 @@ export default class Contract {
         })
     }
 
+    // Checks if an airline has paid the funding fee in the Data Contract
     isAirlineActivated(airline, callback) {
         let self = this;
         self.flightSuretyData.methods
@@ -82,6 +88,7 @@ export default class Contract {
         })
     }
 
+    // Allows an airline to send funds to the Data Contract
     activateAirline(airline, fee, callback) {
         let self = this;
         let feeETH = self.web3.utils.toWei(fee.toString(), 'ether');
@@ -90,12 +97,14 @@ export default class Contract {
             .send({ from: airline, value: feeETH, gas: '5000000'}, callback);
     }
 
+    // It returns the list of address which shall be used as airlines during Dapp testing
     getAirlines() {
         let self = this;
         return self.airlines;
      }
 
-    fetchFlightStatus(airline, flight, timestamp) {
+    // It triggers the emmission of the oracleRequest event to retrieve the status of a flight from the oracles
+    fetchFlightStatus(airline, flight, timestamp, callback) {
         let self = this;
         let payload = {
             airline: airline,
@@ -104,9 +113,10 @@ export default class Contract {
         } 
         self.flightSuretyApp.methods
             .fetchFlightStatus(payload.airline, payload.flight, payload.timestamp)
-            .send({ from: self.owner});
+            .send({ from: self.owner}, callback);
     }
 
+    // Calls on an App Contract function which gives the stored information about a flight
     getFlightStatus(airline, flight, timestamp, callback) {
         let self = this;
         self.flightSuretyApp.methods
@@ -116,6 +126,8 @@ export default class Contract {
         })
     }
 
+    // Allows registration of a new flight. In order to avoid problems during testing with flights expiring, 
+    // two days are added to the timestamp
     registerNewFlight(flight, airline, callback) {
         let self = this;
         let twoDays = 2*24*61*60*1000;
@@ -132,6 +144,7 @@ export default class Contract {
             });
     }
 
+    // Calls the function which allows a passenger to buy insurance
     buy(airline, flight, timestamp, premium, passenger,callback) {
         let self = this;
         let payload = {
@@ -145,6 +158,7 @@ export default class Contract {
             .send({ from: passenger, value: payload.value, gas: '5000000'}, callback);
     }
 
+    // It checks on the status of an insurance policy, given flight data and the passenger's address
     getInsuranceStatus(airline, flight, timestamp, passenger, callback) {
         let self = this;
         let payload = {
@@ -161,6 +175,8 @@ export default class Contract {
             });
     }
 
+    // It allows a passenger to receive the 1.5x refund for their policy, once the flight status is 20 
+    // and they have been credited
     claimInsurance(airline, flight, timestamp, passenger, callback) {
         let self = this;
         let payload = {
@@ -173,6 +189,7 @@ export default class Contract {
             .send({ from: passenger, gas: '5000000'}, callback);        
     }
 
+    // Listens to the 'FlightStatusInfo' oracle triggered event   
     listenOracleResponse(callback) {
         let self = this;
         self.flightSuretyApp.events.FlightStatusInfo(callback);

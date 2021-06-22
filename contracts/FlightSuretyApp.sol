@@ -29,6 +29,7 @@ contract FlightSuretyApp {
     struct Flight {
         string flightNumber;
         bool isRegistered;
+        bool landed;
         uint8 statusCode;
         uint256 updatedTimestamp;        
         address airline;
@@ -37,8 +38,8 @@ contract FlightSuretyApp {
 
     // The factor by which passengers are compensated (initially 1.5x)is stored in the following variables
     // This factor can be modified via the updateCompensatingFactor function
-    uint8 factorNumerator = 3;
-    uint8 factorDenominator = 2;
+    uint8 public factorNumerator = 3;
+    uint8 public factorDenominator = 2;
 
     /*** Referencing the data contract ***/
     // Adding state variable referencing Data contract
@@ -183,6 +184,7 @@ contract FlightSuretyApp {
         flights[key] = Flight ({
                                     flightNumber: flight,
                                     isRegistered: true,
+                                    landed: false,
                                     statusCode: 0,
                                     updatedTimestamp: timestamp,
                                     airline: msg.sender
@@ -202,13 +204,18 @@ contract FlightSuretyApp {
                                     uint8 statusCode
                                 )
                                 internal
+                                requireIsOperational
     {
         bytes32 key = getFlightKey(airline, flight, timestamp);
+        require(flights[key].isRegistered, "This flight is not registered");
+        require(!flights[key].landed, "The status of this flight has already been updated");
         flights[key].statusCode = statusCode;
-        // Status other than 0 sets the flight isRegistered variable to false
+        // Status other than 0 sets the flight landed variable to true
         if(statusCode != 0) {
-            flights[key].isRegistered = false;            
+            flights[key].landed = true;            
         }
+
+        // Passengers are credited if flight is late due to the airline
         if(statusCode == 20) {
             flightSuretyData.creditInsurees(airline, flight, timestamp, factorNumerator, factorDenominator);
         }
@@ -223,7 +230,11 @@ contract FlightSuretyApp {
                             uint256 timestamp                            
                         )
                         external
+                        requireIsOperational
     {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        require(flights[flightKey].isRegistered, "This flight is not registered");
+        require(!flights[flightKey].landed, "The status of this flight has already been updated");
         uint8 index = getRandomIndex(msg.sender);
 
         // Generate a unique key for storing the request
@@ -236,6 +247,7 @@ contract FlightSuretyApp {
         emit OracleRequest(index, airline, flight, timestamp);
     }
 
+    // Read the current status of a flight without triggering a OracleRequest event
     function getFlightStatus
                                 (
                                     address airline,
@@ -243,6 +255,7 @@ contract FlightSuretyApp {
                                     uint256 timestamp
                                 )
                                 external
+                                view
                                 returns (uint8 status)
     {
         bytes32 key = getFlightKey(airline, flight, timestamp);
@@ -378,6 +391,7 @@ contract FlightSuretyApp {
                             string flight,
                             uint256 timestamp
                         )
+                        pure
                         internal
                         returns(bytes32) 
     {

@@ -335,7 +335,6 @@ contract FlightSuretyData {
                                     bool registered
                                 )
                                 external
-                                view
                                 requireIsOperational
                                 isCallerAuthorized
     {

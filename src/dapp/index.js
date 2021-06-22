@@ -28,7 +28,8 @@ var flightList = [];
                 }
             }
             else if (result == false) {
-                // Authorize app contract on the data contract
+                // If App contract is not authorized, a button is activated at the top 
+                // of the page whichs allows to authorize app contract on the data contract
                 DOM.elid('authorize-app').addEventListener('click', () => {
                     // Write transaction
                     contract.authorizeApp( (error, result) => {    
@@ -40,17 +41,19 @@ var flightList = [];
                         }          
                     });
                 });
-            }
-            
+            }            
         });
 
         // Read airline accounts
         airlineList = contract.getAirlines();
         
+        // Display the list of airlines and their status of registration
         displayAirlines(airlineList, contract);
 
+        // Create an airline dropdown selector to simplify the process of registering new flights
         airlineSelector(airlineList);
 
+        // Listen to OracleResponse event and update the status of the corresponding flight
         contract.listenOracleResponse((error, event) => {
             //console.log(error,result);
             if(event) {
@@ -59,6 +62,8 @@ var flightList = [];
                 let row = 0;
                 console.log(DOM.elid(`flight-row-${row}`));
                 console.log(eventResult);
+                // Loop through all the flights which are displayed on the page and update the status
+                // of the flight corresponding to the event
                 while (document.body.contains(DOM.elid(`flight-row-${row}`))) {
                     let flightRow = DOM.elid(`flight-row-${row}`);
                     if(flightRow.children[0].innerText == eventResult.airline &&
@@ -71,6 +76,7 @@ var flightList = [];
             }            
         });
         
+        // Display the list of flights the moment there is at least one flight on it
         if(flightList.length > 0) {
             displayFlights(flightList, contract);
         }
@@ -78,11 +84,11 @@ var flightList = [];
         // Airline registers new flight
         DOM.elid('submit-flight').addEventListener('click', (event) => {
             event.preventDefault();
+            // Catch the data in the new flight form
             let newFlightForm = document.forms.flightdata;
-            console.log(newFlightForm);
             let flight = newFlightForm.elements.flightnumber.value;
             let airline = newFlightForm.elements.flightairline.value;
-            // Write transaction
+            // Write transaction on the Smart Contract
             contract.registerNewFlight(flight, airline, (error, result, payload) => {
                 if(result) {
                     flightList.push([payload.airline, payload.flight, payload.timestamp]);
@@ -112,6 +118,7 @@ function display(title, description, results) {
     displayDiv.append(section);
 }
 
+// This function creates a dropdown selector of the airine addresses
 function airlineSelector (airlines) {
     let airlineSelector = DOM.elid('flight-airline-selector');
     airlines.map((airline) => {
@@ -119,12 +126,14 @@ function airlineSelector (airlines) {
     });
 }
 
+// This function displays the list of airlines, as well as the buttons which allow to register and activate them
 function displayAirlines(airlines, contract) {
     let displayDiv = DOM.elid("airline-registry");
     if(document.body.contains(DOM.elid('airlines-registry'))) {
         displayDiv.removeChild(DOM.elid('airlines-registry'));
     }
     let section = DOM.form({id: 'airlines-registry', name: 'airlines'});
+    // Creating the row with the headers
     let headerRow = DOM.div({className: 'row'});
     headerRow.appendChild(DOM.div({className: 'col-sm-6 field'}, "Airline address"));
     headerRow.appendChild(DOM.div({className: 'col-sm-2 field'}, "Sponsoring airline"));
@@ -132,12 +141,15 @@ function displayAirlines(airlines, contract) {
     headerRow.appendChild(DOM.div({className: 'col-sm-2 field'}, "Activation"));
     section.append(headerRow);
     let rowNumber = 0;
+    // Creating the row for each airline
     airlines.map((airline) => {
         let row = DOM.div({className: 'row', id: `airline-row-${rowNumber}`});
         row.appendChild(DOM.div({className: 'col-sm-6 field text-truncate'}, airline));
+        // sponsorRadio element allows to choose the airline which sponsors/registers a new airline
         let sponsorRadio = DOM.div({className: 'form-check col-sm-2'});
         sponsorRadio.appendChild(DOM.input({type: 'radio', className: 'form-check-input', name: 'airlinesponsor', value: airline}));
         row.appendChild(sponsorRadio);
+        // If the airline is registered, the 'Register' button is disabled
         contract.isAirlineRegistered(airline, (error, result) => {
             let registrationText;
             let registrationButton
@@ -156,6 +168,7 @@ function displayAirlines(airlines, contract) {
             }
             row.appendChild(registrationButton);
         });
+        // If the airline is activated, the 'Activate' button is inactive
         contract.isAirlineActivated(airline, (error, result) => {
             let activationText;
             let activationButton
@@ -179,9 +192,11 @@ function displayAirlines(airlines, contract) {
     displayDiv.append(section);
 }
 
+// This function allows to register a new airline
 function registerAirline(event, contract, airlines) {
     event.preventDefault();
     let airlineForm = document.forms.airlines;
+    // The address of the sponsoring airline is retrieved from the radio input selector
     let sponsoringAirline = airlineForm.elements.airlinesponsor.value;
     let newAirline = event.target.value;
     contract.registerAirline(newAirline, sponsoringAirline, (error, result) => {
@@ -195,6 +210,7 @@ function registerAirline(event, contract, airlines) {
     });
 }
 
+// This function allows an airline to pay the 10 ETH funding fee and be activated
 function activateAirline(event, contract, airlines) {
     event.preventDefault();
     let newAirline = event.target.value;
@@ -220,6 +236,7 @@ function activateAirline(event, contract, airlines) {
     airlineRow.insertAdjacentElement("afterend", subFormRow);
 }
 
+// This function shows all the flights which have been registered on the current browser session
 function displayFlights(flights, contract) {
     let displayDiv = DOM.elid("flight-registration");
     let sectionId = "flights-section";
@@ -231,11 +248,13 @@ function displayFlights(flights, contract) {
     let section = DOM.section({id:sectionId});
     section.appendChild(DOM.hr());
     section.appendChild(DOM.h2("List of current flights"));
+    // Create the header row
     let row = section.appendChild(DOM.div({className:'row'}));
     let columnNames = ['Airline address', 'Flight number', 'Timestamp', 'Fetch Status', 'Buy Insurance', 'Check/Claim insurance', 'Flight Status'];
     for(let name of columnNames) {
         row.appendChild(DOM.div({className: 'col-sm', align: 'center'}, name));        
     }
+    // Create the rows with flight information and the buttons to interact with the flights
     flights.map((flight) => {
         let row = section.appendChild(DOM.div({id: `flight-row-${rowNumber}`, className:'row'}));
         row.appendChild(DOM.div({className: 'col-sm field-value text-truncate'}, flight[0]));
@@ -258,19 +277,26 @@ function displayFlights(flights, contract) {
     displayDiv.append(section);
 }
 
+// This function triggers the OracleRequest to update the status of a flight
 function fetchFlightStatus(event, flight, contract) {
     event.preventDefault();
     let fetchAirline = flight[0];
     let fetchFlight = flight[1];
     let fetchTimestamp = flight[2];
     contract.fetchFlightStatus(fetchAirline, fetchFlight, fetchTimestamp, (error, result) => {
+        if(error) {
+            alert(error);
+        }
         console.log(error);
         console.log(result);
     });    
 }
 
+// This function creates a dialog under a flight whichs allows the user to enter their passenger address
+// and the amount they want to pay for the insurance
 function buyFlightInsurance(event, flight, contract) {
     event.preventDefault();
+    // Read the flight data of the row
     let flightRow = event.target.parentNode;
     let fetchAirline = flight[0];
     let fetchFlight = flight[1];
@@ -279,6 +305,7 @@ function buyFlightInsurance(event, flight, contract) {
     let headerRow = DOM.div({className: 'row field'});
     let subFormRow = DOM.div({className: 'row subform'});
     let passengerAddressInput = DOM.input({name: 'insurancepassenger', className: 'col-sm-4', type: 'text', placeholder: 'Passenger address'});
+    // The premium input has a max value of 1 ETH and can be entered in increments of 0.01 ETH
     let premiumInput = DOM.input({name: 'insurancepremium', className: 'col-sm-3', type: 'number', step: '0.01', min: '0', max: '1'});
     headerRow.appendChild(DOM.label({className: 'col-sm-4'}, 'Passenger address'));
     headerRow.appendChild(DOM.label({className: 'col-sm-3'}, 'Premium'));
@@ -288,6 +315,7 @@ function buyFlightInsurance(event, flight, contract) {
     let passengerAddress;
     let premium;
     subFormRow.appendChild(rowButton);
+    // On submission of the form, the 'buy' function of the Smart Contract is called
     section.addEventListener('submit', (event) => {
         event.preventDefault();
         passengerAddress = passengerAddressInput.value;
@@ -307,8 +335,12 @@ function buyFlightInsurance(event, flight, contract) {
     flightRow.insertAdjacentElement("afterend", section);
 }
 
+// This function creates a dialog under a flight whichs allows the user to enter their passenger address
+// and check how much they paid for their insurance, know if they have been credited any refund and trigger
+// the Smart Contract function which pays them in case the flight was late
 function checkInsuranceStatus(event, flight, contract) {
     event.preventDefault();
+    // Read the flight data of the row
     let flightRow = event.target.parentNode;
     let fetchAirline = flight[0];
     let fetchFlight = flight[1];
@@ -327,9 +359,10 @@ function checkInsuranceStatus(event, flight, contract) {
     section.appendChild(headerRow);
     section.appendChild(subFormRow);
     flightRow.insertAdjacentElement("afterend", section);
+    // On submission of the form, the corresponding 'getInsuranceStatus' or 
+    // 'claimInsurance' funtions of the Smart Contract are called
     section.addEventListener('submit', (event) => {
         event.preventDefault();
-        console.log(event);
         passengerAddress = passengerAddressInput.value;
         if(event.submitter.value == 'Check insurance') {
             contract.getInsuranceStatus(fetchAirline, fetchFlight, fetchTimestamp, passengerAddress, (result) => {
